@@ -4,10 +4,13 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 int choix;
+ int trouve;
 int estVide;
 int estVide2;
+time_t date_presence;
 char empty[50];
 char empty2[50];
 char email[50];
@@ -29,9 +32,8 @@ typedef struct {
 } DATES;
 
 typedef struct {
-    int quota;
-    DATES dates;
-    int etudiant[];
+    int code;
+    time_t date_presence;
 } Presence;
 
 typedef struct {
@@ -63,7 +65,7 @@ typedef struct {
 
 DATES saisirDates(void)
 {
-    DATES d;
+       DATES d;
     time_t t = time(NULL);
     struct tm *tm_info = localtime(&t);
 
@@ -120,15 +122,49 @@ void informationUtilisateur(Utilisateur u) {
     }
     printf("Date utilisateur : %02d/%02d/%04d\n", u.date_naissance.jour, u.date_naissance.mois, u.date_naissance.annee);
 }
-void fichierUtilisateur(Utilisateur u){
-    FILE *fichierUtilisateur;
-    fichierUtilisateur = fopen("utilisateurs.txt", "a");
-    if(fichierUtilisateur == NULL){
-        printf("Erreur lors de l'ouverture du fichierUtilisateur.");
-        return;
+void marquerPresence(int code, Presence* presences, int* nombrePresences) {
+    presences[*nombrePresences].code = code;
+    presences[*nombrePresences].date_presence = time(NULL);
+    (*nombrePresences)++;
+}
+int saisirUtilisateurs(int code) {
+    FILE *fichier = fopen("utilisateurs.txt", "r");
+    if (fichier == NULL) {
+        printf("Erreur lors de l'ouverture du fichier utilisateurs.txt.");
+        return 0;
     }
-    fprintf(fichierUtilisateur, "id: %d matricule: %s email: %s motdepasse: %s nom: %s prenom: %s Date naissance: %02d/%02d/%04d niveau: %d code : %d\n", u.id, u.matricule, u.email, u.motdepasse, u.nom, u.prenom, u.date_naissance.jour, u.date_naissance.mois, u.date_naissance.annee, u.niveau, u.code);
-    fclose(fichierUtilisateur);
+
+    Utilisateur u;
+    while (fscanf(fichier, "%d %s %s %s %s %d %d %d %d %d", &u.id, u.email, u.motdepasse, u.nom, u.prenom, &u.date_naissance.jour, &u.date_naissance.mois, &u.date_naissance.annee, &u.niveau, &u.code) != EOF) {
+        if (u.code == code) {
+            fclose(fichier);
+            return 1;
+        }
+    }
+
+    fclose(fichier);
+    return 0; 
+}
+void enregistrerPresence(Utilisateur u) {
+    FILE *fichierPresence = fopen("presences.txt", "a");
+    if (!fichierPresence) {
+        printf("Impossible d'ouvrir le fichier des présences.\n");
+    }
+    
+    fprintf(fichierPresence, "id: %d matricule: %s email: %s motdepasse: %s nom: %s prenom: %s Date naissance: %02d/%02d/%04d niveau: %d code : %d\n", u.id, u.matricule, u.email, u.motdepasse, u.nom, u.prenom, u.date_naissance.jour, u.date_naissance.mois, u.date_naissance.annee, u.niveau, u.code);
+    DATES saisirDates(void);
+    fclose(fichierPresence);
+    printf("Présence de l'étudiant marquée.\n");
+
+}
+int estDejaMarque(Presence *presences, int nombrePresences) {
+     int code;
+    for (int i = 0; i < nombrePresences; i++) {
+        if (presences[i].code == code) {
+            return 1;
+        }
+    }
+    return 0;
 }
 void saisirUtilisateur(){
  do {
@@ -223,22 +259,46 @@ void generationfichierUtilisateurs() {
     }
 }
 void marquerPresences() {
+    int quitter = 0;
+    Utilisateur u;
+    Presence presences[10000];
+    int nombrePresences = 0;
+
     printf("---------------------------------------------------------------------------------------\n");
     printf("|-----------------Vous avez choisi de marquer les présences.--------------------------|\n");
     printf("---------------------------------------------------------------------------------------\n");
-    char nomEtudiant[50];
-    int code;
-    do{
-    saisirMotdepasse();
-    printf("Présence de l'étudiant %s marquée.\n", nomEtudiant);
-    if(code != 0){
-        printf(" mot de pass correct, au suivant");
-    }
-    else if(code = 0){
-        printf("mot de passe incorrect, veillez ressaisir");
-    }
-    }while((code != 0) && (code = 0)); 
+
+    do {
+        printf("Saisissez le code de l'étudiant à marquer : ");
+        scanf("%d", &u.code);
+        trouve = 0;
+        FILE *fichierPresence = fopen("presences.txt", "a");
+        if (!fichierPresence) {
+            printf("Impossible d'ouvrir le fichier des présences.\n");
+        }else{
+            if (saisirUtilisateurs(u.code) && !estDejaMarque(presences, nombrePresences)) {
+                enregistrerPresence(u);
+                nombrePresences++;
+            } else {
+                printf("\033[0;31m");
+                if (!saisirUtilisateurs(u.code)) {
+                printf("Code incorrect, veuillez ressaisir.\n");
+                } else {
+                printf("Le code a déjà été marqué aujourd'hui ou n'est pas valide.\n");
+                }
+                printf("\033[0m");
+        }
+        }
+        
+        fprintf(fichierPresence, "id: %d matricule: %s email: %s motdepasse: %s nom: %s prenom: %s Date naissance: %02d/%02d/%04d niveau: %d code : %d\n", u.id, u.matricule, u.email, u.motdepasse, u.nom, u.prenom, u.date_naissance.jour, u.date_naissance.mois, u.date_naissance.annee, u.niveau, u.code);
+        DATES saisirDates(void);
+        fclose(fichierPresence);
+}while (saisirUtilisateurs(u.code) && !estDejaMarque(presences, nombrePresences));
+        printf("Tapez 1 pour quitter : ");
+        scanf("%d", &quitter);
+        void connexion();
 }
+
 Etudiant envoyerMessage(char *expediteur, char *contenu) {
     Etudiant e;
     if (e.messagesNonLus < 10) {
@@ -276,7 +336,7 @@ void menuAdmin() {
     printf("|-------------------BIENVENUE DANS LA PLATEFORME ADMINISTRATEUR-----------------------|\n");
     printf("---------------------------------------------------------------------------------------\n");
     printf("1………..GESTION DES ÉTUDIANTS \n");
-    printf("2………..GÉNÉRATION DE fichierUtilisateurS \n");
+    printf("2………..GÉNÉRATION DE FICHIERS ETUDIANTS \n");
     printf("3………..MARQUER LES PRÉSENCES \n");
     printf("4………..ENVOYER DES MESSAGES \n");
     printf("5………..DECONNEXION \n");
@@ -293,13 +353,14 @@ void menuAdmin() {
                 generationfichierUtilisateurs();
                 break;
             case 3:
-               // marquerPresences();
+               marquerPresences();
                 break;
             case 4:
                 envoyerDesMessages();
                 break;
             case 5:
                 printf("Déconnexion en cours...\n");
+                printf("deconnexion reussit\n");
                 break;
             default:
                 printf("Choix invalide. Veuillez saisir un nombre entre 1 et 5.\n");
@@ -315,13 +376,33 @@ void menuApprenant(){
     printf("3………..MES MESSAGES (0) \n");
     printf("4………..DECONNEXION \n");
     printf(" VEUILLEZ FAIRE UN CHOIX (1 - 4) : ");
+
+    do {
+        scanf("%d", &choix);
+
+        switch (choix) {
+            case 1:
+               // marquezPresence();
+                break;
+            case 2:
+               // nombreMinutesAbsence();
+                break;
+            case 3:
+              //  mesMessages();
+                break;
+            case 4:
+                //deconnexion
+                break;
+            default:
+                printf("Choix invalide. Veuillez saisir un nombre entre 1 et 5.\n");
+        }
+
+    } while (choix != 4);
 }
 void connexion(){
 
     Utilisateur u;
     printf("Bienvenue sur votre interface de connexion \n");
-
-    int trouve;
 
     do {
         saisirUtilisateur();
@@ -336,7 +417,7 @@ void connexion(){
             return;
         }
 
-        trouve = 0;
+            trouve = 0;
         int niveau_int;
         while (fscanf(fichier, "%d %s %s %s %s %d %d %d %d %d", &u.id, u.email, u.motdepasse, u.nom, u.prenom, &u.date_naissance.jour, &u.date_naissance.mois, &u.date_naissance.annee, &niveau_int, &u.code) != EOF) {
             if (strcmp(empty2, u.email) == 0 && strcmp(empty, u.motdepasse) == 0) {
@@ -361,8 +442,14 @@ void connexion(){
             printf("\033[0m");
         }
     }while (!trouve);
-
 }
+
 int main(){
+
+    printf("---------------------------------------------------------------------------------------\n");
+    printf("|---------------------------------BIENVENUE DANS L'APPLICATION------------------------|\n");
+    printf("---------------------------------------------------------------------------------------\n");
     connexion();
+    connexion();
+
 }
